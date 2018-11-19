@@ -1,0 +1,242 @@
+---
+title: "Ames house prices"
+
+output: html_document
+---
+
+NAME: Roberto Buzzini 
+
+BADGE: 790312
+
+NICKNAME: r.buzzini 
+
+TEAM: ConcoBeach
+
+ROUND: 1st
+
+### Summary
+
+La mia strategia è stata
+
+1. Analizzare le eventuali osservazioni anomale
+2. Imputare gli na
+3. Trasformare SalePrice in log(SalePrice)
+4. Random Forest
+5. XgBoost con Caret
+6. Creare il vettore di previsione medio con i due modelli costruiti
+
+### References: 
+* https://www.kaggle.com/erikbruin/house-prices-lasso-xgboost-and-a-detailed-eda 
+
+### Models
+
+* XgBoost e RandomForest
+
+```{r startup, include = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = T, eval=T, message=F, warning=F, error=F, comment=NA, cache=F, R.options=list(width=220))
+```
+
+### Codice R per riprodurre l'ultima sottomissione:
+
+```{r}
+# Carico i pacchetti necessari per l'analisi:
+library(readr)
+library(randomForest)
+library(caret)
+
+#Importo i dati
+train <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/60.csv")
+test <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/61.csv")
+
+#Combino train e test set per la preprocessing
+test$SalePrice <- NA
+aggr <- rbind(train,test)
+
+#Elimino l'osservazione 1112 poichè sembra anomala: qualità alta ma prezzo basso
+aggr <- aggr[-1112,]
+
+#Tratto gli NA:
+
+colonne_NA <- which(colSums(is.na(aggr)) > 0)
+sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
+
+##Pool.QC
+aggr$Pool.QC <- as.integer(aggr$Pool.QC)
+aggr$Pool.QC[is.na(aggr$Pool.QC)] <- 0
+aggr$Pool.QC <- as.factor(aggr$Pool.QC)
+
+##MiscFeature
+aggr$Misc.Feature <- as.integer(aggr$Misc.Feature)
+aggr$Misc.Feature[is.na(aggr$Misc.Feature)] <- 0
+aggr$Misc.Feature <- as.factor(aggr$Misc.Feature)
+
+##Alley
+aggr$Alley <- as.integer(aggr$Alley)
+aggr$Alley[is.na(aggr$Alley)] <- 0
+aggr$Alley <- as.factor(aggr$Alley)
+
+##Fence
+aggr$Fence <- as.integer(aggr$Fence)
+aggr$Fence[is.na(aggr$Fence)] <- 0
+aggr$Fence <- as.factor(aggr$Fence)
+
+##Fireplace.Qu
+aggr$Fireplace.Qu <- as.integer(aggr$Fireplace.Qu)
+aggr$Fireplace.Qu[is.na(aggr$Fireplace.Qu)] <- 0
+aggr$Fireplace.Qu <- as.factor(aggr$Fireplace.Qu)
+
+##Lot.Frontage
+###Imputo la moda:
+aggr$Lot.Frontage <- as.integer(aggr$Lot.Frontage)
+for (i in 1:nrow(aggr)){
+  if(is.na(aggr$Lot.Frontage[i])){
+    aggr$Lot.Frontage[i] <- as.integer(median(aggr$Lot.Frontage[aggr$Neighborhood==aggr$Neighborhood[i]], na.rm=TRUE)) 
+  }
+}
+
+###Garage.Yr.Blt
+aggr$Garage.Yr.Blt[is.na(aggr$Garage.Yr.Blt)] <- aggr$Year.Built[is.na(aggr$Garage.Yr.Blt)]
+
+###Garage.type
+aggr$Garage.Type <- as.integer(aggr$Garage.Type)
+aggr$Garage.Type[is.na(aggr$Garage.Type)] <- 0
+aggr$Garage.Type <- as.factor(aggr$Garage.Type)
+
+###Garage.Finish
+aggr$Garage.Finish <- as.integer(aggr$Garage.Finish)
+aggr$Garage.Finish[is.na(aggr$Garage.Finish)] <- 0
+aggr$Garage.Finish <- as.factor(aggr$Garage.Finish)
+
+###Garage.Qual
+aggr$Garage.Qual <- as.integer(aggr$Garage.Qual)
+aggr$Garage.Qual[is.na(aggr$Garage.Qual)] <- 0
+aggr$Garage.Qual <- as.factor(aggr$Garage.Qual)
+
+###Garage.Cond
+aggr$Garage.Cond <- as.integer(aggr$Garage.Cond)
+aggr$Garage.Cond[is.na(aggr$Garage.Cond)] <- 0
+aggr$Garage.Cond <- as.factor(aggr$Garage.Cond)
+
+###Bsmt.Qual
+aggr$Bsmt.Qual <- as.integer(aggr$Bsmt.Qual)
+aggr$Bsmt.Qual[is.na(aggr$Bsmt.Qual)] <- 0
+aggr$Bsmt.Qual <- as.factor(aggr$Bsmt.Qual)
+
+###Bsmt.Cond
+aggr$Bsmt.Cond <- as.integer(aggr$Bsmt.Cond)
+aggr$Bsmt.Cond[is.na(aggr$Bsmt.Cond)] <- 0
+aggr$Bsmt.Cond <- as.factor(aggr$Bsmt.Cond)
+
+###Bsmt.Exposure
+aggr$Bsmt.Exposure <- as.integer(aggr$Bsmt.Exposure)
+aggr$Bsmt.Exposure[is.na(aggr$Bsmt.Exposure)] <- 0
+aggr$Bsmt.Exposure <- as.factor(aggr$Bsmt.Exposure)
+
+###BmstFin.Type.1
+aggr$BsmtFin.Type.1 <- as.integer(aggr$BsmtFin.Type.1)
+aggr$BsmtFin.Type.1[is.na(aggr$BsmtFin.Type.1)] <- 0
+aggr$BsmtFin.Type.1 <- as.factor(aggr$BsmtFin.Type.1)
+
+###BsmtFin.Type.2
+aggr$BsmtFin.Type.2 <- as.integer(aggr$BsmtFin.Type.2)
+aggr$BsmtFin.Type.2[is.na(aggr$BsmtFin.Type.2)] <- 0
+aggr$BsmtFin.Type.2 <- as.factor(aggr$BsmtFin.Type.2)
+
+###Masonry variables
+aggr$Mas.Vnr.Area[is.na(aggr$Mas.Vnr.Area)] <- 0
+
+##MS.Zoning
+#Moda:
+aggr$MS.Zoning[is.na(aggr$MS.Zoning)] <- names(sort(-table(aggr$MS.Zoning)))[1]
+
+##Electrical
+#Moda:
+aggr$Electrical[is.na(aggr$Electrical)] <- names(sort(-table(aggr$Electrical)))[1]
+
+sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
+
+#Devo ancora sistemare alcuni NA
+
+##Bsmt.Exposure
+summary(aggr$Bsmt.Exposure)
+aggr[is.na(aggr$Bsmt.Exposure),names(aggr)=="Bsmt.Exposure"] <- 0
+
+##Lot.Frontage
+aggr[is.na(aggr$Lot.Frontage),names(aggr)=="Lot.Frontage"] <- 60
+
+##Mas.Vnr.Type
+aggr$Mas.Vnr.Type <- as.integer(aggr$Mas.Vnr.Type)
+aggr[is.na(aggr$Mas.Vnr.Type),names(aggr)=="Mas.Vnr.Type"] <- 0
+aggr$Mas.Vnr.Type <- as.factor(aggr$Mas.Vnr.Type)
+
+##BsmtFin.Type.2
+aggr[is.na(aggr$BsmtFin.Type.2),names(aggr)=="BsmtFin.Type.2"] <- 0
+
+##Bsmt.Full.Bath
+aggr[is.na(aggr$Bsmt.Full.Bath),names(aggr)=="Bsmt.Full.Bath"] <- 0
+
+##Bsmt.Half.Bath
+aggr[is.na(aggr$Bsmt.Half.Bath),names(aggr)=="Bsmt.Half.Bath"] <- 0
+
+##Garage.Finish
+aggr[is.na(aggr$Garage.Finish),names(aggr)=="Garage.Finish"] <- 0
+
+##Bsmt.Qual
+aggr[is.na(aggr$Bsmt.Qual),names(aggr)=="Bsmt.Qual"] <- 0
+
+##Garage.Area
+aggr[is.na(aggr$Garage.Area),names(aggr)=="Garage.Area"] <- 0
+
+##Garage.Qual
+aggr[is.na(aggr$Garage.Qual),names(aggr)=="Garage.Qual"] <- 0
+
+##Garage.Cond
+aggr[is.na(aggr$Garage.Cond),names(aggr)=="Garage.Cond"] <- 0
+
+##BsmtFin.SF.1
+aggr[is.na(aggr$BsmtFin.SF.1),names(aggr)=="BsmtFin.SF.1"] <- 0
+
+## BsmtFin.SF.2
+aggr[is.na(aggr$BsmtFin.SF.2),names(aggr)=="BsmtFin.SF.2"] <- 0
+
+##Bsmt.Unf.SF
+aggr[is.na(aggr$Bsmt.Unf.SF),names(aggr)=="Bsmt.Unf.SF"] <- 559.2 #la media
+
+## Total.Bsmt.SF
+aggr[is.na(aggr$Total.Bsmt.SF),names(aggr)=="Total.Bsmt.SF"] <- 1051 #la media
+
+##Garage.Cars
+aggr[is.na(aggr$Garage.Cars),names(aggr)=="Garage.Cars"] <- 0
+
+colonne_NA <- which(colSums(is.na(aggr)) > 0)
+sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
+
+#Divido train e test set per addestrare gli algoritmi di previsione
+train1 <- aggr[!is.na(aggr$SalePrice),]
+test1 <-aggr[is.na(aggr$SalePrice),]
+test1 <-test1[,-82]
+
+#La variabile risposta SalePrice è asimmetrica, per cui la trasformo in logaritmo
+
+#Random Forest
+set.seed(123)
+rf <- randomForest(log(SalePrice) ~., data=train1,importance=TRUE)
+yhat_rf <- exp(predict(rf, newdata=test1))
+
+#Xgboost con caret
+ctrl <- trainControl(method = "cv",
+                     number = 10)
+
+fit_xgb <- train(log(SalePrice) ~ ., data = train1, 
+                 method = "xgbTree",
+                 metric = "RMSE",
+                 trControl = ctrl)
+
+yhat_xgb <- exp(predict(fit_xgb, newdata=test1))
+
+#Vettore medio di previsioni:
+yhat <- (yhat_rf+yhat_xgb)/2 
+
+head(yhat)
+
+```

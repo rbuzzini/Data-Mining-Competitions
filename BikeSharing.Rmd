@@ -1,0 +1,165 @@
+---
+title: "Bike sharing"
+output: html_document
+---
+
+NAME: Roberto Buzzini 
+
+BADGE: 790312
+
+NICKNAME: r.buzzini 
+
+TEAM: ConcoBeach
+
+ROUND: 1st
+
+### Summary
+
+La mia strategia è stata
+
+1. Estrarre le varie componenti della variabile datetime
+2. Trasformare count, casual e registered in log(x+1)
+3. Trasformare alcune variabili numeriche in fattori
+4. Creare la variabili day_type
+5. Gestire gli na in windspeed
+6. XgBoost con Caret
+
+
+### References: 
+* [Random Forest] https://www.kaggle.com/srisudheera/bike-sharing-demand
+
+### Models
+
+* XgBoost
+
+```{r startup, include = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = T, eval=T, message=F, warning=F, error=F, comment=NA, cache=F, R.options=list(width=220))
+```
+
+### Codice R per riprodurre l'ultima sottomissione:
+
+```{r}
+# Carico i pacchetti necessari per l'analisi:
+library(readr)
+library(fasttime)
+library(lubridate)
+library(rpart)
+library(dplyr)
+library(randomForest)
+library(caret)
+
+#Importo i dati:
+train <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/99.csv")
+test <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/100.csv")
+
+#Estraggo le variabili hour, month,year e wday da "datetime":
+
+train %>% 
+  mutate(datetime = fastPOSIXct(datetime, "GMT")) %>% 
+  mutate(hour = hour(datetime),
+         month = month(datetime),
+         year = year(datetime),
+         wday = wday(datetime)) -> train
+
+test %>% 
+  mutate(datetime = fastPOSIXct(datetime, "GMT")) %>% 
+  mutate(hour = hour(datetime),
+         month = month(datetime),
+         year = year(datetime),
+         wday = wday(datetime)) -> test
+
+#Trasformo count, casual e registered con la funzione log1p poichè sono asimmetriche in distribuzione: 
+train$count <- log1p(train$count)
+train$casual <- log1p(train$casual)
+train$registered <- log1p(train$registered)
+
+# Combino train e test per fare preprocessing:
+test$count <- NA
+test$casual <- NA
+test$registered <- NA
+
+aggr <- rbind(train,test)
+aggr <- aggr[,-1] #elimino la variabile datetime poichè è diventata inutile
+
+#Trasformo alcune variabii numeriche in fattori:
+aggr$season <- as.factor(aggr$season)
+aggr$holiday <- as.factor(aggr$holiday)
+aggr$weather <- as.factor(aggr$weather)
+aggr$workingday <- as.factor(aggr$workingday)
+aggr$month <- as.factor(aggr$month)
+aggr$year <- as.factor(aggr$year)
+aggr$wday <- as.factor(aggr$wday)
+
+#Creo la variabile day_type per mettere in evidenza anche i weekend:
+aggr$day_type <- 0
+aggr$day_type[aggr$holiday==0 & aggr$workingday==0] <- "weekend"
+aggr$day_type[aggr$holiday==1] <- "holiday"
+aggr$day_type[aggr$holiday==0 & aggr$workingday==1] <- "working day"
+aggr$day_type <- as.factor(aggr$day_type)
+
+#I valori 0 di windspeed indicano dei dati mancanti. In questo caso ho deciso di utilizzare una Random Forest per imputarli:
+table(aggr$windspeed==0)
+k <- aggr$windspeed==0
+wind_0 <- subset(aggr,k)
+wind_1 <- subset(aggr,!k)
+str(wind_1)
+set.seed(123)
+rf <- randomForest(windspeed ~ season+weather +humidity +month+temp+ year+atemp, data=wind_1,importance=TRUE, ntree=250)
+prev <- predict(rf,wind_0)
+aggr$windspeed[k] <- prev
+
+#Divido nuovamente train e test in modo tale da addestrare un algoritmo
+train <- aggr[!is.na(aggr$count),]
+test <- aggr[is.na(aggr$count),]
+test <- test[,-c(9:11)]
+
+#Tramite il pacchetto caret addestro due XgBoost, il primo con lo scopo di prevedere "casual", mentre il secondo "registered". Successivamente sommando questi due vettori di previsione otterrò le previsioni per la variabile "count"
+fml_cas <- casual ~ season+holiday+workingday+windspeed+weather+temp+atemp+humidity+hour+month+year+wday+day_type
+fml_reg <- registered ~ season+holiday+workingday+windspeed+weather+temp+atemp+humidity+hour+month+year+wday+day_type
+
+set.seed(12345)
+
+ctrl <- trainControl(method = "cv",
+                     number = 10)
+
+fit_xgb1 <- train( fml_cas, data = train, 
+                    method = "xgbTree",
+                    metric = "RMSE",
+                    trControl = ctrl)
+ 
+fit_xgb2 <- train(fml_reg , data = train, 
+                    method = "xgbTree",
+                    metric = "RMSE",
+                    trControl = ctrl)
+ 
+#Ottengo le seguenti previsioni:
+yhat_xgb1 = expm1(predict(fit_xgb1, test)) #casual
+yhat_xgb2 = expm1(predict(fit_xgb2, test)) #registered
+yhat<- yhat_xgb1+yhat_xgb2 #count
+
+head(yhat) 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

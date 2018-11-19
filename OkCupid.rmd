@@ -1,0 +1,89 @@
+---
+title: "OKCupid"
+output: html_document
+---
+
+NAME: Roberto Buzzini
+
+BADGE: 790312
+
+NICKNAME: r.buzzini
+
+TEAM: ConcoBeach
+
+ROUND: 1st
+
+### Summary
+
+La mia strategia è stata
+
+1. Unire training e test set per poi dividerli
+2. Random Forest
+3. XgBoost con Caret
+4. Creare il vettore di previsione medio con i due modelli costruiti
+
+### References
+
+-
+
+### Models
+
+*RandomForest e XGBoost 
+
+```{r startup, include = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = T, eval=T, message=F, warning=F, error=F, comment=NA, cache=F, R.options=list(width=220))
+```
+
+### R code to reproduce the last submission
+
+```{r}
+#carico i pacchetti
+library(readr)
+library(caret)
+
+#carico i dati
+train <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/101.csv")
+test <- read.csv("http://bee-fore.s3-eu-west-1.amazonaws.com/datasets/102.csv")
+
+#aggiungo la variabile risposta al test per poter unire test e train sets
+test$Class = NA
+aggr <- rbind(train,test)
+
+train <- aggr[!is.na(aggr$Class),]
+test <- aggr[is.na(aggr$Class),]
+
+#impostiamo un seme in modo tale che i componenti del gruppo ottengano lo stesso risultato
+set.seed(12345)
+
+#decidiamo quali criteri devono seguire sia RF che XGB
+ctrl <- trainControl(method = "cv",
+                     number = 10,
+                     classProbs = TRUE,
+                     summaryFunction = twoClassSummary,
+                     sampling = "down"
+)
+
+#creiamo il modello di classificazione con la RandomForest
+fit_rf <- train(Class ~ ., data = train, 
+                method = "rf",
+                metric = "ROC",
+                trControl = ctrl)
+
+#prevediamo con questo modello
+phat_rf = predict(fit_rf, test,  type = "prob")[,"stem"]
+
+#creiamo il modello di classificazione con lo XGBoost
+fit_xgb <- train(Class ~ ., data = train, 
+                 method = "xgbTree",
+                 metric = "ROC",
+                 trControl = ctrl)
+
+#prevediamo con questo modello
+phat_xgb = predict(fit_xgb, test,  type = "prob")[,"stem"]
+
+#previsioni finali date dalle media delle due previsioni con i differenti modelli
+phat <- (phat_rf+phat_xgb)/2
+
+head(phat)
+
+```

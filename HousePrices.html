@@ -171,13 +171,10 @@ aggr &lt;- aggr[-1112,]
 
 #Tratto gli NA:
 
-colonne_NA &lt;- which(colSums(is.na(aggr)) &gt; 0)
-sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)</code></pre>
-<pre><code>       Pool.QC   Misc.Feature          Alley          Fence      SalePrice   Fireplace.Qu   Lot.Frontage  Garage.Yr.Blt    Garage.Qual    Garage.Cond    Garage.Type  Garage.Finish      Bsmt.Qual      Bsmt.Cond 
-          2916           2823           2731           2357           1470           1422            490            159            158            158            157            157             79             79 
- Bsmt.Exposure BsmtFin.Type.1 BsmtFin.Type.2   Mas.Vnr.Area Bsmt.Full.Bath Bsmt.Half.Bath   BsmtFin.SF.1   BsmtFin.SF.2    Bsmt.Unf.SF  Total.Bsmt.SF    Garage.Cars    Garage.Area 
-            79             79             79             23              2              2              1              1              1              1              1              1 </code></pre>
-<pre class="r"><code>##Pool.QC
+#colonne_NA &lt;- which(colSums(is.na(aggr)) &gt; 0)
+#sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
+
+##Pool.QC
 aggr$Pool.QC &lt;- as.integer(aggr$Pool.QC)
 aggr$Pool.QC[is.na(aggr$Pool.QC)] &lt;- 0
 aggr$Pool.QC &lt;- as.factor(aggr$Pool.QC)
@@ -270,18 +267,11 @@ aggr$MS.Zoning[is.na(aggr$MS.Zoning)] &lt;- names(sort(-table(aggr$MS.Zoning)))[
 #Moda:
 aggr$Electrical[is.na(aggr$Electrical)] &lt;- names(sort(-table(aggr$Electrical)))[1]
 
-sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)</code></pre>
-<pre><code>     SalePrice   Lot.Frontage Bsmt.Full.Bath Bsmt.Half.Bath   BsmtFin.SF.1   BsmtFin.SF.2    Bsmt.Unf.SF  Total.Bsmt.SF    Garage.Cars    Garage.Area          Alley   Mas.Vnr.Area      Bsmt.Qual      Bsmt.Cond 
-          1470              3              2              2              1              1              1              1              1              1              0              0              0              0 
- Bsmt.Exposure BsmtFin.Type.1 BsmtFin.Type.2   Fireplace.Qu    Garage.Type  Garage.Yr.Blt  Garage.Finish    Garage.Qual    Garage.Cond        Pool.QC          Fence   Misc.Feature 
-             0              0              0              0              0              0              0              0              0              0              0              0 </code></pre>
-<pre class="r"><code>#Devo ancora sistemare alcuni NA
+#sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
 
 ##Bsmt.Exposure
-summary(aggr$Bsmt.Exposure)</code></pre>
-<pre><code>   0    1    2    3    4    5 
-  79    4  418  283  239 1906 </code></pre>
-<pre class="r"><code>aggr[is.na(aggr$Bsmt.Exposure),names(aggr)==&quot;Bsmt.Exposure&quot;] &lt;- 0
+#summary(aggr$Bsmt.Exposure)
+aggr[is.na(aggr$Bsmt.Exposure),names(aggr)==&quot;Bsmt.Exposure&quot;] &lt;- 0
 
 ##Lot.Frontage
 aggr[is.na(aggr$Lot.Frontage),names(aggr)==&quot;Lot.Frontage&quot;] &lt;- 60
@@ -330,11 +320,10 @@ aggr[is.na(aggr$Total.Bsmt.SF),names(aggr)==&quot;Total.Bsmt.SF&quot;] &lt;- 105
 ##Garage.Cars
 aggr[is.na(aggr$Garage.Cars),names(aggr)==&quot;Garage.Cars&quot;] &lt;- 0
 
-colonne_NA &lt;- which(colSums(is.na(aggr)) &gt; 0)
-sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)</code></pre>
-<pre><code>SalePrice 
-     1470 </code></pre>
-<pre class="r"><code>#Divido train e test set per addestrare gli algoritmi di previsione
+#colonne_NA &lt;- which(colSums(is.na(aggr)) &gt; 0)
+#sort(colSums(sapply(aggr[colonne_NA], is.na)), decreasing = TRUE)
+
+#Divido train e test set per addestrare gli algoritmi di previsione
 train1 &lt;- aggr[!is.na(aggr$SalePrice),]
 test1 &lt;-aggr[is.na(aggr$SalePrice),]
 test1 &lt;-test1[,-82]

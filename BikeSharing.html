@@ -151,6 +151,12 @@ $(document).ready(function () {
 <li>XgBoost</li>
 </ul>
 </div>
+<div id="pacchetti-r-non-standard" class="section level3">
+<h3>Pacchetti R non standard</h3>
+<ul>
+<li>Nessuno</li>
+</ul>
+</div>
 <div id="codice-r-per-riprodurre-lultima-sottomissione" class="section level3">
 <h3>Codice R per riprodurre l’ultima sottomissione:</h3>
 <pre class="r"><code># Carico i pacchetti necessari per l'analisi:
@@ -231,6 +237,7 @@ test &lt;- test[,-c(9:11)]
 fml_cas &lt;- casual ~ season+holiday+workingday+windspeed+weather+temp+atemp+humidity+hour+month+year+wday+day_type
 fml_reg &lt;- registered ~ season+holiday+workingday+windspeed+weather+temp+atemp+humidity+hour+month+year+wday+day_type
 
+set.seed(12345)
 set.seed(12345)
 
 ctrl &lt;- trainControl(method = &quot;cv&quot;,
